@@ -1,3 +1,4 @@
+const { ObjectID } = require("mongodb")
 const mongoose = require("mongoose")
 const User = require("../models/User")
 
@@ -25,6 +26,12 @@ taskSchema = new mongoose.Schema({
         type : mongoose.Schema.Types.ObjectId,
         required: true,
         ref : "User"
+    },
+    doneBy : {
+        type : Array
+    },
+    counter :{
+        type : Number
     }
 },{
     timestamps: true
