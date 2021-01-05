@@ -3,6 +3,8 @@ const Task = require("../models/Task")
 const authRequest = require("../middlewares/apiAuth")
 const User2 = require("../models/User2")
 const { findOneAndUpdate } = require('../models/Task')
+const{ sendWelcomeMailNow }= require("../emails/account")
+const User = require('../models/User')
 
 const router = new express.Router()
 
@@ -12,7 +14,8 @@ router.post('/tasks',authRequest,async (req,res)=>{
     // const task = new Task(req.body)
     const task = new Task({
         ...req.body,
-        owner : req.validUser._id
+        owner : req.validUser._id,
+        counter : 0
     })
     
     try{
@@ -22,9 +25,7 @@ router.post('/tasks',authRequest,async (req,res)=>{
     catch(e){
         res.status(500).send(e)
     }
-    // task.save()
-    // .then(resp=>{res.status(200).send(task)})
-    // .catch(e=>{res.status(500).send(e)})
+
     
 })
 
@@ -55,9 +56,6 @@ router.get("/tasks", authRequest, async(req,res)=>{
 
     try{
 
-        //modern_way...
-        // const tasks = await Task.find({owner:req.validUser._id})
-    // console.log(typeof match.status)
         await req.validUser.populate({
             path: 'tasks',
             match,
@@ -68,19 +66,11 @@ router.get("/tasks", authRequest, async(req,res)=>{
             }
         }).execPopulate()
 
-        //this gives you all available tasksss..
-        // const tasks = await Task.find({})
         res.send(req.validUser.tasks)
 
     }catch(e){
         res.status(400).send(e)
     }
-
-    // Task.find({}).then(task=>{
-    //     res.send(task)
-    // }).catch(e=>{
-    //     res.status(400).send(e)
-    // })
    
    })
 
@@ -104,19 +94,32 @@ router.get("/tasks", authRequest, async(req,res)=>{
  
          res.status(500).send()
      }
-    // Task.findById(req.params.id).then(task=>{
-    //     if(!task){
-    
-    //         return res.status(400).send()
-    //     }
-    //     res.send(task)
-    // }).catch(e=>{
-    //     console.log(e)
-    //     res.status(500).send()
-    // })
 })
 
+//status of particular task..
 
+router.get('/tasks/status/:id', authRequest, async (req,res)=>{
+    const _id = req.params.id
+  try{
+      //modernway
+      const singleTask = await Task.findOne({_id, owner:req.validUser._id})
+      //oldway
+      // const singleTask = await Task.findById(req.params.id)
+      if(!singleTask){
+   
+               return res.status(400).send()
+           }
+           res.send({
+               tasksDoneBy : singleTask.doneBy,
+               completedUserNo : singleTask.counter,
+               status : "inprogresss"
+           })
+   }
+   catch(e){
+
+       res.status(500).send()
+   }
+})
 
 
 
@@ -191,25 +194,101 @@ const task = await Task.findOne({_id:req.params.id})
 // console.log(task)
     const size = parseInt(req.query.onuser)
     try{
-        // console.log("seettign")
+        // this will filterOut users according to minage and maxage criteria...
+        // const taskToDo = await Task.findById(req.params.id)
         
+        console.log(task)
+        console.log("ent.")
+      const agg = await User2.aggregate(
+          [
+             { $sample : {size}},
+            // {age : { $gt : taskToDo.minage , $lte : taskToDo.maxage}}
+            { $match : {age : { $gt : task.minage , $lte : task.maxage} }}
+            
+          ]
+      )
 
-        //getting  random pickss
-        const agg = await User2.aggregate([{$sample:{size}}])
-      
-
-        //just itreating through id of random picks and asssigning Tasks...
+      console.log(agg)
+   
      agg.forEach(async (doc)=>{ 
             let user2 = await User2.findOne({_id:doc._id})
-            console.log(user2)
+            // console.log(user2)
             user2.assignedTasks = await user2.assignedTasks.concat({task})
+           
            await user2.save()        
+        //    sendWelcomeMailNow(user2.email, user2.name)
         })
+        task.isassigned = true
+        await task.save()
         res.status(200).send({agg})
     }catch(e){
 
+        res.status(500).send("Something Went Wrong....")
+
     }
 
+})
+
+
+
+
+
+
+// //Most messy part.....
+// //this route basically performs how many user we want and assign them this task.
+// //tasks/ready/:id?onuser=6
+// //this url can be pointed to incomplted tasksss... we can authenti
+// router.post("/task/ready/:id", authRequest, async(req,res)=>{
+
+//     const task = await Task.findOne({_id:req.params.id})
+//     // console.log(task)
+//         const size = parseInt(req.query.onuser)
+//         try{
+//             // console.log("seettign")
+            
+    
+//             //getting  random pickss
+//             const agg = await User2.aggregate([{$sample:{size}}])
+          
+    
+//             //just itreating through id of random picks and asssigning Tasks...
+//          agg.forEach(async (doc)=>{ 
+//                 let user2 = await User2.findOne({_id:doc._id})
+//                 // console.log(user2)
+//                 user2.assignedTasks = await user2.assignedTasks.concat({task})
+//                await user2.save()        
+//             //    sendWelcomeMailNow(user2.email, user2.name)
+//             })
+//             task.isassigned = true
+//             await task.save()
+//             res.status(200).send({agg})
+//         }catch(e){
+    
+//         }
+    
+//     })
+
+//updated Version :--- 
+router.post('/tasks/updated',authRequest,async (req,res)=>{
+    // const task = new Task(req.body)
+   
+  
+     const questions = req.body.questions
+     const task = new Task({
+        ...req.body,
+        owner : req.validUser._id,
+        counter : 0
+    })
+     console.log("incoming user", typeof questions, questions)
+    try{
+        const saveTask = await task.save()
+        res.status(201).send(saveTask)
+    }
+    catch(e){
+        res.status(500).send(e)
+    }
+
+   
 })
 
 module.exports = router

@@ -14,7 +14,7 @@ const authRequest2 = async (req,res,next)=>{
     const decodedUsingJwt = await jwt.verify(tokenFromRequest, "thisissecondclass")
     console.log(decodedUsingJwt)
     const validUser = await User2.findOne({_id: decodedUsingJwt._id, 'tokens.token': tokenFromRequest})
-    console.log(validUser)
+    
     // console.log("token....",tokenFromRequest)
     // console.log("DecodedUse...",decodedUsingJwt)
     // console.log("FoundedUser..", validUser)

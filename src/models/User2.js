@@ -43,6 +43,12 @@ const user2Schema = new mongoose.Schema({
             }
         }
     },
+    profession :{
+        type : String,
+        enum : ['student','developer','professional','artist','teacher','influencer'],
+        default : 'student',
+    },
+
     tokens :[
         {
             token: {
